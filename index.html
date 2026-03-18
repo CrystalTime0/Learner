@@ -890,35 +890,50 @@
             return{id:uid(),front:term,back:back||'—',interval:0,easeFactor:2.5,repetitions:0,dueDate:today(),lastReview:null,ts:Date.now()};
         }
 
-        // ── Regroupe les mots par liste (champ "list") ──
-        const groups={};      // key = list name (string) or '__none__'
+        // ── Construit une map id → nom depuis data.nodes ──
+        // Les ids peuvent être des nombres (1773858404499) ou des strings ("sov")
+        const nodeNameMap={};
+        if(Array.isArray(data.nodes)){
+            for(const n of data.nodes){
+                if(n.id!=null) nodeNameMap[String(n.id)] = n.name||n.label||null;
+            }
+        }
+
+        // Résout la clé d'un groupe en nom lisible
+        function resolveListName(key){
+            if(key===null||key===undefined||key==='__none__') return 'Divers';
+            const s=String(key);
+            // Cherche dans nodes d'abord
+            if(nodeNameMap[s]) return nodeNameMap[s];
+            // Si la clé est un nombre pur (id numérique sans nom dans nodes), affiche "Liste <id>"
+            if(/^\d+$/.test(s)) return `Liste ${s}`;
+            // Sinon c'est déjà un nom lisible (ex: "sov", "anglais")
+            return s;
+        }
+
+        // ── Regroupe les mots par liste ──
+        // On normalise la clé : priorité à "list" (string nom), puis "listId" (id numérique)
+        const groups={};
         for(const w of words){
-            const key=w.list||w.listId||'__none__';
+            // Certains exports utilisent "list" (string), d'autres "listId" (number)
+            let key='__none__';
+            if(w.list!=null)       key=String(w.list);
+            else if(w.listId!=null) key=String(w.listId);
             if(!groups[key]) groups[key]=[];
             groups[key].push(w);
         }
 
         const listKeys=Object.keys(groups);
 
-        // ── Cas 1 : un seul groupe sans nom → une liste simple ──
+        // ── Cas 1 : tous sans liste → une liste simple ──
         if(listKeys.length===1&&listKeys[0]==='__none__'){
             return{id:uid(),type:'list',name:'Mon Dico',cards:groups['__none__'].map(mkMonDicoCard),ts:Date.now()};
         }
 
         // ── Cas 2 : plusieurs groupes → un dossier contenant des listes ──
         const children=listKeys.map(key=>{
-            const name=key==='__none__'?'Divers':key;
-            return{id:uid(),type:'list',name,cards:groups[key].map(mkMonDicoCard),ts:Date.now()};
+            return{id:uid(),type:'list',name:resolveListName(key),cards:groups[key].map(mkMonDicoCard),ts:Date.now()};
         });
-
-        // ── Arborescence nodes (dossiers imbriqués, si présents dans le json) ──
-        // Mon Dico v2 expose un champ "nodes" pour les dossiers
-        if(data.nodes&&data.nodes.length>0){
-            const folderMap={};
-            data.nodes.forEach(n=>folderMap[n.id]=n);
-            // Reconstruction récursive (préparé pour futures versions de Mon Dico)
-            // Pour l'instant on wrappe simplement les listes dans les dossiers par listId
-        }
 
         return{id:uid(),type:'folder',name:'Mon Dico',children,ts:Date.now()};
     }
