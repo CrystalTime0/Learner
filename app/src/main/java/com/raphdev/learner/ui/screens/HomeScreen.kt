@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -25,11 +26,55 @@ import com.raphdev.learner.ui.viewmodel.ScreenState
 @Composable
 fun AppNavigator(viewModel: SharedViewModel) {
     val currentScreen by viewModel.currentScreen.collectAsState()
+    val selectedGlossaryTerm by viewModel.selectedGlossaryTerm.collectAsState()
+
+    // Gestion de la Pop-up Glossaire
+    if (selectedGlossaryTerm != null) {
+        ModalBottomSheet(onDismissRequest = { viewModel.dismissGlossary() }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text(
+                    text = selectedGlossaryTerm!!.term,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = selectedGlossaryTerm!!.subject,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = selectedGlossaryTerm!!.definition,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { viewModel.dismissGlossary() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("J'ai compris")
+                }
+            }
+        }
+    }
 
     when (currentScreen) {
         ScreenState.HOME -> HomeScreen(viewModel)
         ScreenState.COURSE -> CourseScreen(viewModel)
         ScreenState.QUIZ -> QuizScreen(viewModel)
+        ScreenState.ANNALES -> AnnalesScreen(viewModel)
+        ScreenState.EXAM_DETAIL -> ExamDetailScreen(viewModel)
     }
 }
 
@@ -69,6 +114,42 @@ fun HomeScreen(viewModel: SharedViewModel) {
             modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // BOUTON ACCÈS AUX ANNALES DU BAC
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 8.dp)
+                        .clickable { viewModel.navigateToAnnales() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Book,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Annales & Sujets du Bac",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            Text(
+                                text = "Entraînez-vous sur des sujets réels corrigés pas-à-pas",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+            }
 
             coursesGroupedBySubject.forEach { (subject, coursesList) ->
                 val isExpanded = expandedSubjects.contains(subject)
@@ -170,8 +251,6 @@ fun CourseCardItem(item: CourseWithResult, viewModel: SharedViewModel) {
                     }
                 }
             }
-
-            // Description supprimée ici pour un affichage plus compact
 
             Spacer(modifier = Modifier.height(16.dp))
 

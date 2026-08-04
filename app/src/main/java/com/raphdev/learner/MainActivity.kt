@@ -22,6 +22,8 @@ class MainActivity : ComponentActivity() {
             courseDao = app.database.courseDao(),
             quizDao = app.database.quizDao(),
             quizResultDao = app.database.quizResultDao(),
+            examSubjectDao = app.database.examSubjectDao(),
+            glossaryDao = app.database.glossaryDao(),
             firestore = firestore
         )
 
