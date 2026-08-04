@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -19,8 +19,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.raphdev.learner.data.model.CourseWithResult
-import com.raphdev.learner.ui.viewmodel.SharedViewModel
+import com.raphdev.learner.data.model.ExamSubject
 import com.raphdev.learner.ui.viewmodel.ScreenState
+import com.raphdev.learner.ui.viewmodel.SharedViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +29,6 @@ fun AppNavigator(viewModel: SharedViewModel) {
     val currentScreen by viewModel.currentScreen.collectAsState()
     val selectedGlossaryTerm by viewModel.selectedGlossaryTerm.collectAsState()
 
-    // Gestion de la Pop-up Glossaire
     if (selectedGlossaryTerm != null) {
         ModalBottomSheet(onDismissRequest = { viewModel.dismissGlossary() }) {
             Column(
@@ -73,7 +73,6 @@ fun AppNavigator(viewModel: SharedViewModel) {
         ScreenState.HOME -> HomeScreen(viewModel)
         ScreenState.COURSE -> CourseScreen(viewModel)
         ScreenState.QUIZ -> QuizScreen(viewModel)
-        ScreenState.ANNALES -> AnnalesScreen(viewModel)
         ScreenState.EXAM_DETAIL -> ExamDetailScreen(viewModel)
     }
 }
@@ -82,8 +81,11 @@ fun AppNavigator(viewModel: SharedViewModel) {
 @Composable
 fun HomeScreen(viewModel: SharedViewModel) {
     val coursesGroupedBySubject by viewModel.coursesGroupedBySubject.collectAsState()
+    val examSubjectsGroupedBySubject by viewModel.examSubjectsGroupedBySubject.collectAsState()
     val expandedSubjects by viewModel.expandedSubjects.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
+
+    val allSubjects = (coursesGroupedBySubject.keys + examSubjectsGroupedBySubject.keys).distinct().sorted()
 
     Scaffold(
         topBar = {
@@ -115,61 +117,44 @@ fun HomeScreen(viewModel: SharedViewModel) {
         ) {
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // BOUTON ACCÈS AUX ANNALES DU BAC
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 8.dp)
-                        .clickable { viewModel.navigateToAnnales() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Book,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = "Annales & Sujets du Bac",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Text(
-                                text = "Entraînez-vous sur des sujets réels corrigés pas-à-pas",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                        }
-                    }
-                }
-            }
-
-            coursesGroupedBySubject.forEach { (subject, coursesList) ->
+            allSubjects.forEach { subject ->
+                val courses = coursesGroupedBySubject[subject] ?: emptyList()
+                val annales = examSubjectsGroupedBySubject[subject] ?: emptyList()
+                val totalItems = courses.size + annales.size
                 val isExpanded = expandedSubjects.contains(subject)
 
-                item {
+                item(key = "header_$subject") {
                     SubjectAccordionHeader(
                         subjectName = subject,
-                        courseCount = coursesList.size,
+                        totalCount = totalItems,
                         isExpanded = isExpanded,
                         onToggle = { viewModel.toggleSubject(subject) }
                     )
                 }
 
                 if (isExpanded) {
-                    items(coursesList) { item ->
+                    items(courses, key = { "course_${it.course.id}" }) { item ->
                         CourseCardItem(item = item, viewModel = viewModel)
+                    }
+
+                    if (annales.isNotEmpty()) {
+                        item(key = "annales_label_$subject") {
+                            Text(
+                                text = "Annales & Sujets",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.secondary,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+
+                        items(annales, key = { "exam_${it.id}" }) { exam ->
+                            ExamCardItem(examSubject = exam, viewModel = viewModel)
+                        }
                     }
                 }
 
-                item { Spacer(modifier = Modifier.height(8.dp)) }
+                item(key = "spacer_$subject") { Spacer(modifier = Modifier.height(8.dp)) }
             }
         }
     }
@@ -178,7 +163,7 @@ fun HomeScreen(viewModel: SharedViewModel) {
 @Composable
 fun SubjectAccordionHeader(
     subjectName: String,
-    courseCount: Int,
+    totalCount: Int,
     isExpanded: Boolean,
     onToggle: () -> Unit
 ) {
@@ -203,7 +188,7 @@ fun SubjectAccordionHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "$subjectName ($courseCount)",
+                text = "$subjectName ($totalCount)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = if (isExpanded) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer
@@ -267,6 +252,42 @@ fun CourseCardItem(item: CourseWithResult, viewModel: SharedViewModel) {
                 ) {
                     Text(if (item.result != null) "Refaire Quiz" else "Quiz")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ExamCardItem(examSubject: ExamSubject, viewModel: SharedViewModel) {
+    OutlinedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+            .clickable { viewModel.navigateToExamDetail(examSubject) },
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Assignment,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = examSubject.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Sujet Bac ${examSubject.year}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -16,13 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.raphdev.learner.data.model.ExamSubject
 import com.raphdev.learner.ui.viewmodel.SharedViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnnalesScreen(viewModel: SharedViewModel) {
-    val examSubjects by viewModel.examSubjects.collectAsState()
+    val examSubjectsGrouped by viewModel.examSubjectsGroupedBySubject.collectAsState()
+    val allExamSubjects = remember(examSubjectsGrouped) {
+        examSubjectsGrouped.values.flatten()
+    }
 
     BackHandler {
         viewModel.navigateHome()
@@ -47,7 +49,7 @@ fun AnnalesScreen(viewModel: SharedViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(examSubjects) { subject ->
+            items(allExamSubjects, key = { it.id }) { subject ->
                 ElevatedCard(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -92,10 +94,10 @@ fun AnnalesScreen(viewModel: SharedViewModel) {
 @Composable
 fun ExamDetailScreen(viewModel: SharedViewModel) {
     val examSubject by viewModel.selectedExamSubject.collectAsState()
-    var selectedTab by remember { mutableStateOf(0) } // 0: Sujet, 1: Corrigé
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     BackHandler {
-        viewModel.navigateToAnnales()
+        viewModel.navigateHome()
     }
 
     Scaffold(
@@ -103,7 +105,7 @@ fun ExamDetailScreen(viewModel: SharedViewModel) {
             TopAppBar(
                 title = { Text(examSubject?.title ?: "Détail Annal") },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.navigateToAnnales() }) {
+                    IconButton(onClick = { viewModel.navigateHome() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Retour")
                     }
                 }
@@ -159,7 +161,7 @@ fun ExamDetailScreen(viewModel: SharedViewModel) {
                     }
                 },
                 update = { webView ->
-                    webView.loadDataWithBaseURL(null, fullHtml, "text/html", "UTF-8", null)
+                    webView.loadDataWithBaseURL("https://localhost/", fullHtml, "text/html; charset=utf-8", "UTF-8", null)
                 }
             )
         }

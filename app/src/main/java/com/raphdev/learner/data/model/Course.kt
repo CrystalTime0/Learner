@@ -9,5 +9,5 @@ data class Course(
     val title: String = "",
     val subject: String = "Général",
     val content: String = "",
-    val summary: String = "" // Fiche synthétique / résumé
+    val summary: String = ""
 )

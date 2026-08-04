@@ -20,11 +20,11 @@ fun QuizScreen(viewModel: SharedViewModel) {
     val course by viewModel.selectedCourse.collectAsState()
     val quizzes by viewModel.currentQuizzes.collectAsState()
 
-    var currentQuizIndex by remember { mutableStateOf(0) }
-    var score by remember { mutableStateOf(0) }
-    var quizFinished by remember { mutableStateOf(false) }
+    val courseId = course?.id ?: ""
+    var currentQuizIndex by remember(courseId) { mutableIntStateOf(0) }
+    var score by remember(courseId) { mutableIntStateOf(0) }
+    var quizFinished by remember(courseId) { mutableStateOf(false) }
 
-    // Intercepte le bouton/geste physique "Retour" du téléphone pour revenir à l'accueil
     BackHandler {
         viewModel.navigateHome()
     }
@@ -32,7 +32,7 @@ fun QuizScreen(viewModel: SharedViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Quiz: ${course?.title}") },
+                title = { Text("Quiz : ${course?.title ?: ""}") },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateHome() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Retour")
@@ -64,41 +64,48 @@ fun QuizScreen(viewModel: SharedViewModel) {
                     Text("Retour à l'accueil", style = MaterialTheme.typography.titleMedium)
                 }
             } else {
-                val currentQuiz = quizzes[currentQuizIndex]
-                val progress by animateFloatAsState(targetValue = (currentQuizIndex + 1).toFloat() / quizzes.size.toFloat())
+                val currentQuiz = quizzes.getOrNull(currentQuizIndex)
+                if (currentQuiz != null) {
+                    val progress by animateFloatAsState(
+                        targetValue = (currentQuizIndex + 1).toFloat() / quizzes.size.toFloat(),
+                        label = "QuizProgress"
+                    )
 
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(8.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
-                Text(
-                    text = currentQuiz.question,
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    Text(
+                        text = currentQuiz.question,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
-                currentQuiz.options.forEachIndexed { index, option ->
-                    OutlinedButton(
-                        onClick = {
-                            if (index == currentQuiz.correctAnswerIndex) score++
-                            if (currentQuizIndex < quizzes.size - 1) {
-                                currentQuizIndex++
-                            } else {
-                                quizFinished = true
-                                viewModel.saveQuizScore(score, quizzes.size)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(56.dp)
-                    ) {
-                        Text(option, style = MaterialTheme.typography.bodyLarge)
+                    currentQuiz.options.forEachIndexed { index, option ->
+                        OutlinedButton(
+                            onClick = {
+                                val newScore = if (index == currentQuiz.correctAnswerIndex) score + 1 else score
+                                if (index == currentQuiz.correctAnswerIndex) score = newScore
+
+                                if (currentQuizIndex < quizzes.size - 1) {
+                                    currentQuizIndex++
+                                } else {
+                                    quizFinished = true
+                                    viewModel.saveQuizScore(newScore, quizzes.size)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).height(56.dp)
+                        ) {
+                            Text(option, style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
                 }
             }

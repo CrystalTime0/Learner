@@ -8,11 +8,14 @@ import com.raphdev.learner.data.model.ExamSubject
 import com.raphdev.learner.data.model.GlossaryTerm
 import com.raphdev.learner.data.model.Quiz
 import com.raphdev.learner.data.repository.DataRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
-enum class ScreenState { HOME, COURSE, QUIZ, ANNALES, EXAM_DETAIL }
+enum class ScreenState { HOME, COURSE, QUIZ, EXAM_DETAIL }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class SharedViewModel(private val repository: DataRepository) : ViewModel() {
 
     val coursesGroupedBySubject: StateFlow<Map<String, List<CourseWithResult>>> =
@@ -20,8 +23,10 @@ class SharedViewModel(private val repository: DataRepository) : ViewModel() {
             list.groupBy { it.course.subject }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    val examSubjects: StateFlow<List<ExamSubject>> =
-        repository.examSubjects.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val examSubjectsGroupedBySubject: StateFlow<Map<String, List<ExamSubject>>> =
+        repository.examSubjects.map { list ->
+            list.groupBy { it.subject }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     private val _expandedSubjects = MutableStateFlow<Set<String>>(emptySet())
     val expandedSubjects: StateFlow<Set<String>> = _expandedSubjects.asStateFlow()
@@ -38,8 +43,12 @@ class SharedViewModel(private val repository: DataRepository) : ViewModel() {
     private val _selectedGlossaryTerm = MutableStateFlow<GlossaryTerm?>(null)
     val selectedGlossaryTerm = _selectedGlossaryTerm.asStateFlow()
 
-    private val _currentQuizzes = MutableStateFlow<List<Quiz>>(emptyList())
-    val currentQuizzes: StateFlow<List<Quiz>> = _currentQuizzes.asStateFlow()
+    val currentQuizzes: StateFlow<List<Quiz>> = _selectedCourse
+        .flatMapLatest { course ->
+            if (course != null) repository.getLocalQuizzes(course.id)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
@@ -56,7 +65,7 @@ class SharedViewModel(private val repository: DataRepository) : ViewModel() {
     }
 
     fun openGlossaryTerm(termName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Main) {
             val term = repository.getGlossaryTerm(termName)
             _selectedGlossaryTerm.value = term ?: GlossaryTerm(
                 term = termName,
@@ -76,16 +85,7 @@ class SharedViewModel(private val repository: DataRepository) : ViewModel() {
 
     fun navigateToQuiz(course: Course) {
         _selectedCourse.value = course
-        viewModelScope.launch {
-            repository.getLocalQuizzes(course.id).collect { quizzes ->
-                _currentQuizzes.value = quizzes
-            }
-        }
         _currentScreen.value = ScreenState.QUIZ
-    }
-
-    fun navigateToAnnales() {
-        _currentScreen.value = ScreenState.ANNALES
     }
 
     fun navigateToExamDetail(subject: ExamSubject) {

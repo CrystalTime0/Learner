@@ -36,7 +36,6 @@ class DataRepository(
 
     suspend fun seedInitialData() {
         if (courseDao.getCourseCount() == 0) {
-            // 1. Cours avec mode Complet ET Fiche Synthétique + Termes du Glossaire
             val defaultCourses = listOf(
                 Course(
                     id = "c1",
@@ -79,7 +78,31 @@ class DataRepository(
             )
             courseDao.insertAll(defaultCourses)
 
-            // 2. Glossaire
+            val defaultQuizzes = listOf(
+                Quiz(
+                    id = "q1",
+                    courseId = "c1",
+                    question = "En quelle année débute le règne personnel de Louis XIV ?",
+                    options = listOf("1610", "1661", "1715", "1789"),
+                    correctAnswerIndex = 1
+                ),
+                Quiz(
+                    id = "q2",
+                    courseId = "c1",
+                    question = "Où Louis XIV réunit-il la noblesse pour la surveiller ?",
+                    options = listOf("Le Louvre", "La Bastille", "Château de Versailles", "Château de Blois"),
+                    correctAnswerIndex = 2
+                ),
+                Quiz(
+                    id = "q3",
+                    courseId = "c2",
+                    question = "Qu'est-ce qu'un allèle ?",
+                    options = listOf("Un chromosome entier", "Une version alternative d'un gène", "Une cellule reproductrice", "Une protéine"),
+                    correctAnswerIndex = 1
+                )
+            )
+            quizDao.insertAll(defaultQuizzes)
+
             val defaultGlossary = listOf(
                 GlossaryTerm(
                     id = "g1",
@@ -96,7 +119,6 @@ class DataRepository(
             )
             glossaryDao.insertAll(defaultGlossary)
 
-            // 3. Annales du Bac
             val defaultAnnales = listOf(
                 ExamSubject(
                     id = "es1",
